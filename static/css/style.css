@@ -662,6 +662,100 @@ body {
   font-size: 1rem;
 }
 
+.add-bike-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-section {
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.form-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0.5rem;
+}
+
+.form-section h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--blue-600);
+  margin-bottom: 1rem;
+}
+
+.optional {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: lowercase;
+}
+
+.success-panel {
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #047857;
+  font-weight: 600;
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.compare-card {
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 1.1rem;
+  border: 1px solid var(--border-light);
+}
+
+.compare-card-wide {
+  grid-column: 1 / -1;
+}
+
+.compare-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+
+.compare-value {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.65rem;
+}
+
+.compare-bar {
+  height: 6px;
+  background: var(--blue-100);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.compare-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--blue-400), var(--blue-600));
+  border-radius: 999px;
+}
+
+.compare-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
   .navbar {

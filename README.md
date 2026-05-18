@@ -5,6 +5,7 @@ A machine learning project that classifies how sensitive Indian motorcycle buyer
 ## Features
 
 - **Find Bike** — set minimum mileage, minimum CC, and maximum price; get the top 10 matching models ranked by fit
+- **Add Bike** — submit a new bike with full CSV fields, save to the dataset, and compare with ML prediction and similar bikes
 - **Dashboard** — dataset stats, sensitivity distribution, and model leaderboard
 - **Predict** — enter bike specs and get a price sensitivity label with probability breakdown
 - **Browse Bikes** — search and filter the dataset by brand, segment, and sensitivity
@@ -23,6 +24,7 @@ bikeselect/
 │   ├── base.html
 │   ├── index.html
 │   ├── select.html
+│   ├── add_bike.html
 │   ├── predict.html
 │   └── bikes.html
 └── static/css/style.css
@@ -71,6 +73,7 @@ This loads `indian_bikes_dataset_1000.csv`, prints dataset summary, shows sensit
 | GET | `/api/leaderboard` | Model comparison metrics |
 | GET | `/api/bikes` | Filter bikes (`q`, `brand`, `segment`, `sensitivity`, `limit`, `offset`) |
 | POST | `/api/select` | Find top 10 bikes by mileage, CC, and max price (JSON body) |
+| POST | `/api/bikes/add` | Add bike to CSV, predict sensitivity, compare with dataset (JSON body) |
 | POST | `/api/predict` | Predict sensitivity from bike features (JSON body) |
 
 ### Example bike selection request

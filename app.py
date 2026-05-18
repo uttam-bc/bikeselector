@@ -5,10 +5,14 @@ from flask import Flask, jsonify, render_template, request
 from bike_selector import (
     SENS_COLORS,
     SENS_ORDER,
+    append_bike_to_csv,
+    compare_bike_with_dataset,
     engineer_features,
     get_dataset_stats,
     get_form_options,
     load_and_train,
+    load_dataset_only,
+    parse_bike_input,
     select_bikes_to_records,
 )
 
@@ -34,8 +38,20 @@ form_options = None
 def init_app():
     global df, ml, stats, form_options
     df, ml = load_and_train(CSV_PATH)
+    refresh_stats()
+
+
+def refresh_stats():
+    global stats, form_options
     stats = get_dataset_stats(df)
     form_options = get_form_options(df)
+
+
+def reload_data():
+    """Reload CSV into memory after a new bike is added."""
+    global df
+    df = load_dataset_only(CSV_PATH)
+    refresh_stats()
 
 
 @app.route("/")
@@ -107,6 +123,47 @@ def api_select():
         },
         "bikes": results,
     })
+
+
+@app.route("/add-bike")
+def add_bike_page():
+    return render_template(
+        "add_bike.html",
+        options=form_options,
+        sens_colors=SENS_COLORS,
+        sens_order=SENS_ORDER,
+    )
+
+
+@app.route("/api/bikes/add", methods=["POST"])
+def api_add_bike():
+    data = request.get_json(silent=True) or request.form
+    try:
+        row = parse_bike_input(data)
+    except (KeyError, TypeError, ValueError) as exc:
+        return jsonify({"error": f"Invalid input: {exc}"}), 400
+
+    if not row["brand"] or not row["model"]:
+        return jsonify({"error": "Brand and model are required"}), 400
+
+    if row["segment"] not in ("budget", "mid", "premium"):
+        return jsonify({"error": "Segment must be budget, mid, or premium"}), 400
+
+    comparison = compare_bike_with_dataset(df, row, ml)
+    row["price_sensitivity"] = comparison["bike"]["price_sensitivity"]
+
+    try:
+        append_bike_to_csv(CSV_PATH, row)
+    except OSError as exc:
+        return jsonify({"error": f"Could not save to CSV: {exc}"}), 500
+
+    reload_data()
+    comparison["saved"] = True
+    comparison["message"] = (
+        f"{row['brand']} {row['model']} added to dataset "
+        f"({stats['rows']} bikes total)."
+    )
+    return jsonify(comparison)
 
 
 @app.route("/bikes")

@@ -3,6 +3,7 @@
 # Clean End-to-End ML Pipeline
 # =========================================================
 
+import os
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -870,6 +871,192 @@ def get_dataset_stats(df: pd.DataFrame) -> dict:
             .astype(int)
             .to_dict()
         ),
+    }
+
+
+CSV_COLUMNS = [
+    "brand",
+    "model",
+    "cc",
+    "segment",
+    "year",
+    "speedometer_type",
+    "top_speed_kmh",
+    "mileage_kmpl",
+    "fuel_tank_liters",
+    "factory_price_inr",
+    "gst_rate_pct",
+    "gst_amount_inr",
+    "ex_showroom_inr",
+    "on_road_price_inr",
+    "overall_score",
+    "price_increase_scenario_pct",
+    "buyer_behaviour",
+    "price_sensitivity",
+]
+
+
+def parse_bike_input(data: dict) -> dict:
+    """Validate form/API input and build a complete CSV row."""
+    factory = float(data["factory_price_inr"])
+    gst_rate = float(data["gst_rate_pct"])
+    gst_amount = round(
+        float(data["gst_amount_inr"])
+        if data.get("gst_amount_inr")
+        else factory * gst_rate / 100
+    )
+    ex_showroom = round(
+        float(data["ex_showroom_inr"])
+        if data.get("ex_showroom_inr")
+        else factory + gst_amount
+    )
+
+    return {
+        "brand": str(data["brand"]).strip(),
+        "model": str(data["model"]).strip(),
+        "cc": float(data["cc"]),
+        "segment": str(data["segment"]).strip().lower(),
+        "year": int(data["year"]),
+        "speedometer_type": str(data["speedometer_type"]).strip(),
+        "top_speed_kmh": float(data["top_speed_kmh"]),
+        "mileage_kmpl": float(data["mileage_kmpl"]),
+        "fuel_tank_liters": float(data["fuel_tank_liters"]),
+        "factory_price_inr": factory,
+        "gst_rate_pct": gst_rate,
+        "gst_amount_inr": gst_amount,
+        "ex_showroom_inr": ex_showroom,
+        "on_road_price_inr": float(data["on_road_price_inr"]),
+        "overall_score": float(data["overall_score"]),
+        "price_increase_scenario_pct": float(
+            data["price_increase_scenario_pct"]
+        ),
+        "buyer_behaviour": str(data["buyer_behaviour"]).strip(),
+        "price_sensitivity": str(data.get("price_sensitivity", "")).strip(),
+    }
+
+
+def append_bike_to_csv(csv_path: str, row: dict) -> None:
+    """Append one bike row to the dataset CSV."""
+    new_df = pd.DataFrame([row], columns=CSV_COLUMNS)
+    header = not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0
+    new_df.to_csv(csv_path, mode="a", header=header, index=False)
+
+
+def load_dataset_only(csv_path: str) -> pd.DataFrame:
+    """Load and preprocess CSV without retraining models."""
+    dataset = BikeDataset(csv_path)
+    dataset.preprocess()
+    return dataset.df
+
+
+def _percentile_rank(series: pd.Series, value: float) -> float:
+    return round(float((series <= value).mean() * 100), 1)
+
+
+def find_similar_bikes(
+    df: pd.DataFrame,
+    row: dict,
+    top_n: int = 5,
+) -> list[dict]:
+    """Find closest bikes by normalized spec distance."""
+    features = [
+        "cc",
+        "mileage_kmpl",
+        "on_road_price_inr",
+        "overall_score",
+        "top_speed_kmh",
+    ]
+    work = df[features].astype(float)
+    new_vec = np.array([[row[f] for f in features]], dtype=float)
+
+    mins = work.min()
+    maxs = work.max()
+    span = (maxs - mins).replace(0, 1)
+    norm = (work - mins) / span
+    new_norm = (new_vec - mins.values) / span.values
+
+    dist = np.sqrt(((norm - new_norm) ** 2).sum(axis=1))
+    work_df = df.copy()
+    work_df["_dist"] = dist
+    best = (
+        work_df.sort_values("_dist")
+        .drop_duplicates(subset=["brand", "model"])
+        .head(top_n)
+    )
+
+    cols = [
+        "brand", "model", "cc", "segment", "mileage_kmpl",
+        "on_road_price_inr", "overall_score", "price_sensitivity", "_dist",
+    ]
+    out = best[cols].copy()
+    max_dist = out["_dist"].max() or 1.0
+    out["similarity_pct"] = (100 * (1 - out["_dist"] / max_dist)).round(1)
+    out = out.drop(columns=["_dist"])
+    out["on_road_price_inr"] = out["on_road_price_inr"].astype(int)
+    return out.to_dict(orient="records")
+
+
+def compare_bike_with_dataset(
+    df: pd.DataFrame,
+    row: dict,
+    ml: "BikeMLPipeline",
+    top_similar: int = 5,
+) -> dict:
+    """Predict sensitivity and compare new bike against the dataset."""
+    features = engineer_features(row)
+    prediction = ml.predict_row(features)
+
+    if not row.get("price_sensitivity"):
+        row["price_sensitivity"] = prediction["prediction"]
+
+    comparison = {
+        "price_inr": {
+            "value": int(row["on_road_price_inr"]),
+            "percentile": _percentile_rank(
+                df["on_road_price_inr"], row["on_road_price_inr"]
+            ),
+            "dataset_avg": int(df["on_road_price_inr"].mean()),
+        },
+        "mileage_kmpl": {
+            "value": row["mileage_kmpl"],
+            "percentile": _percentile_rank(
+                df["mileage_kmpl"], row["mileage_kmpl"]
+            ),
+            "dataset_avg": round(float(df["mileage_kmpl"].mean()), 1),
+        },
+        "cc": {
+            "value": row["cc"],
+            "percentile": _percentile_rank(df["cc"], row["cc"]),
+            "dataset_avg": round(float(df["cc"].mean()), 1),
+        },
+        "overall_score": {
+            "value": row["overall_score"],
+            "percentile": _percentile_rank(
+                df["overall_score"], row["overall_score"]
+            ),
+            "dataset_avg": round(float(df["overall_score"].mean()), 1),
+        },
+    }
+
+    segment_count = int((df["segment"] == row["segment"]).sum())
+    same_segment = df[df["segment"] == row["segment"]]
+    segment_avg_price = (
+        int(same_segment["on_road_price_inr"].mean())
+        if len(same_segment)
+        else None
+    )
+
+    return {
+        "bike": row,
+        "prediction": prediction,
+        "comparison": comparison,
+        "segment": {
+            "name": row["segment"],
+            "count_in_dataset": segment_count,
+            "avg_price_inr": segment_avg_price,
+        },
+        "similar_bikes": find_similar_bikes(df, row, top_similar),
+        "dataset_size": len(df),
     }
 
 
