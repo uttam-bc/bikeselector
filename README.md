@@ -4,7 +4,7 @@ A machine learning project that classifies how sensitive Indian motorcycle buyer
 
 ## Features
 
-- **Find Bike** — set minimum mileage, preferred CC, and maximum price; get the top 10 matching models ranked by fit
+- **Find Bike** — set minimum mileage, minimum CC, and maximum price; get the top 10 matching models ranked by fit
 - **Dashboard** — dataset stats, sensitivity distribution, and model leaderboard
 - **Predict** — enter bike specs and get a price sensitivity label with probability breakdown
 - **Browse Bikes** — search and filter the dataset by brand, segment, and sensitivity
@@ -78,7 +78,7 @@ This loads `indian_bikes_dataset_1000.csv`, prints dataset summary, shows sensit
 ```bash
 curl -X POST http://127.0.0.1:5000/api/select \
   -H "Content-Type: application/json" \
-  -d "{\"min_mileage\":35,\"preferred_cc\":200,\"max_price\":200000,\"cc_tolerance_pct\":25}"
+  -d "{\"min_mileage\":35,\"min_cc\":150,\"max_price\":200000}"
 ```
 
 Response:
@@ -88,9 +88,8 @@ Response:
   "count": 10,
   "filters": {
     "min_mileage": 35,
-    "preferred_cc": 200,
-    "max_price": 200000,
-    "cc_tolerance_pct": 25
+    "min_cc": 150,
+    "max_price": 200000
   },
   "bikes": [
     {
@@ -155,9 +154,9 @@ The highest-accuracy model from the leaderboard is used to classify new bikes vi
 
 ### 5. Bike Selection (Find Bike)
 
-Hard filters: mileage ≥ minimum, on-road price ≤ maximum budget.
+Hard filters: mileage ≥ minimum, engine CC ≥ minimum, on-road price ≤ maximum budget.
 
-Each unique **brand + model** is scored on mileage (higher is better), price (lower is better), CC closeness to your preference, and overall score. Models within the CC tolerance band get a bonus. The top 10 models are returned.
+Each unique **brand + model** is scored on mileage (higher is better), price (lower is better), CC (closer to your minimum ranks higher), and overall score. The top 10 models are returned.
 
 ## Dataset
 

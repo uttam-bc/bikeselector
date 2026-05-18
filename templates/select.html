@@ -3,9 +3,9 @@
 
 {% block content %}
 <section class="page-header">
-  <span class="hero-kicker">The Selection</span>
+  <span class="hero-kicker">Bike Finder</span>
   <h1>Find Your Bike</h1>
-  <p>Set your minimum mileage, preferred engine CC, and maximum budget — we curate the ten finest matches.</p>
+  <p>Tell us your minimum mileage, engine size, and budget — we'll show you the top 10 best matches.</p>
 </section>
 
 <div class="select-layout">
@@ -21,10 +21,10 @@
       </div>
 
       <div class="form-group">
-        <label for="preferred_cc">Preferred Engine CC</label>
-        <input type="number" id="preferred_cc" name="preferred_cc"
-               value="{{ defaults.preferred_cc }}" min="50" max="2000" required>
-        <span class="field-hint">Bikes closer to this CC rank higher</span>
+        <label for="min_cc">Minimum Engine CC</label>
+        <input type="number" id="min_cc" name="min_cc"
+               value="{{ defaults.min_cc }}" min="50" max="2000" required>
+        <span class="field-hint">Only bikes at or above this engine size</span>
       </div>
 
       <div class="form-group">
@@ -34,12 +34,6 @@
         <span class="field-hint">On-road price must be within budget</span>
       </div>
 
-      <div class="form-group">
-        <label for="cc_tolerance_pct">CC Tolerance (%)</label>
-        <input type="number" id="cc_tolerance_pct" name="cc_tolerance_pct"
-               value="{{ defaults.cc_tolerance_pct }}" min="5" max="50" step="5">
-        <span class="field-hint">±% range around preferred CC for bonus scoring</span>
-      </div>
     </div>
 
     <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
@@ -119,7 +113,7 @@
 
       const f = json.filters;
       document.getElementById('results-summary').textContent =
-        `${json.count} model(s) found — min ${f.min_mileage} km/l, ~${f.preferred_cc} cc, max ₹${f.max_price.toLocaleString('en-IN')}`;
+        `${json.count} model(s) found — min ${f.min_mileage} km/l, min ${f.min_cc} cc, max ₹${f.max_price.toLocaleString('en-IN')}`;
 
       const tbody = document.getElementById('results-body');
       tbody.innerHTML = json.bikes.map((b, i) => `

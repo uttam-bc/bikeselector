@@ -68,9 +68,8 @@ def select_page():
         "select.html",
         defaults={
             "min_mileage": 35,
-            "preferred_cc": 200,
+            "min_cc": 150,
             "max_price": 200000,
-            "cc_tolerance_pct": 25,
         },
         sens_colors=SENS_COLORS,
         price_max=int(df["on_road_price_inr"].max()),
@@ -83,31 +82,28 @@ def api_select():
     data = request.get_json(silent=True) or request.form
     try:
         min_mileage = float(data["min_mileage"])
-        preferred_cc = float(data["preferred_cc"])
+        min_cc = float(data.get("min_cc", data.get("preferred_cc")))
         max_price = float(data["max_price"])
-        cc_tolerance_pct = float(data.get("cc_tolerance_pct", 25))
         top_n = min(int(data.get("top_n", 10)), 10)
     except (KeyError, TypeError, ValueError) as exc:
         return jsonify({"error": f"Invalid input: {exc}"}), 400
 
-    if min_mileage < 0 or preferred_cc <= 0 or max_price <= 0:
+    if min_mileage < 0 or min_cc <= 0 or max_price <= 0:
         return jsonify({"error": "Values must be positive"}), 400
 
     results = select_bikes_to_records(
         df,
         min_mileage=min_mileage,
-        preferred_cc=preferred_cc,
+        min_cc=min_cc,
         max_price=max_price,
-        cc_tolerance_pct=cc_tolerance_pct,
         top_n=top_n,
     )
     return jsonify({
         "count": len(results),
         "filters": {
             "min_mileage": min_mileage,
-            "preferred_cc": preferred_cc,
+            "min_cc": min_cc,
             "max_price": max_price,
-            "cc_tolerance_pct": cc_tolerance_pct,
         },
         "bikes": results,
     })

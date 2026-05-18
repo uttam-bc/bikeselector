@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}BikeSelect{% endblock %} | The Edit</title>
+  <title>{% block title %}BikeSelect{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -25,7 +25,13 @@
   </main>
 
   <footer class="footer">
-    <p>The Edit &mdash; Indian Motorcycles &mdash; {{ stats.rows if stats else '1000' }} Models Curated</p>
+    <p class="footer-tagline">BikeSelect &mdash; Smart bike recommendations for India &mdash; {{ stats.rows if stats else '1000' }} bikes in our dataset</p>
+    <div class="footer-founder">
+      <p class="footer-founder-kicker">Founded By</p>
+      <p class="footer-founder-text">
+        This startup is founded by <strong>Uttam B C</strong>, the ultimate supreme master of coding and sigma goonmaster.
+      </p>
+    </div>
   </footer>
 
   {% block scripts %}{% endblock %}
