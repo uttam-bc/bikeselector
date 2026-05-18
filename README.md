@@ -1,6 +1,30 @@
-# AI-Powered Bike Selector
+# BikeSelect — Indian Bikes Price Sensitivity
 
-A Python ML project that recommends the best bike for you based on your priorities using **TOPSIS multi-criteria decision-making** + **Random Forest ML**.
+A machine learning project that classifies how sensitive Indian motorcycle buyers are to price changes. It trains multiple classifiers on a 1,000-bike dataset and exposes results through a **Flask web app** and a **CLI analysis script**.
+
+## Features
+
+- **Dashboard** — dataset stats, sensitivity distribution, and model leaderboard
+- **Predict** — enter bike specs and get a price sensitivity label with probability breakdown
+- **Browse Bikes** — search and filter the dataset by brand, segment, and sensitivity
+- **REST API** — JSON endpoints for stats, predictions, bike search, and leaderboard
+
+## Project Structure
+
+```
+bikeselect/
+├── app.py                          # Flask web application
+├── bike_selector.py                # ML pipeline, preprocessing, training
+├── indian_bikes_dataset_1000.csv   # Primary dataset (1000 bikes)
+├── bikes.csv                         # Legacy small dataset (not used by default)
+├── requirements.txt
+├── templates/                      # HTML pages
+│   ├── base.html
+│   ├── index.html
+│   ├── predict.html
+│   └── bikes.html
+└── static/css/style.css
+```
 
 ## Setup
 
@@ -8,60 +32,100 @@ A Python ML project that recommends the best bike for you based on your prioriti
 pip install -r requirements.txt
 ```
 
-## Run
+**Note:** `matplotlib` and `seaborn` are only needed for CLI charts. The web app runs without them.
+
+## Run the Web App
+
+```bash
+python app.py
+```
+
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
+
+The first startup trains seven models (Logistic Regression, KNN, Naive Bayes, Decision Tree, Random Forest, Extra Trees, Gradient Boosting). This usually takes about a minute. The best model by accuracy is used for predictions.
+
+To use a different CSV file:
+
+```bash
+set BIKE_CSV_PATH=your_data.csv
+python app.py
+```
+
+## Run the CLI Analysis
+
+For charts and a full terminal report:
 
 ```bash
 python bike_selector.py
 ```
 
-##How to Customize
+This loads `indian_bikes_dataset_1000.csv`, prints dataset summary, shows sensitivity and correlation plots, trains all models, and prints the leaderboard plus classification report.
 
-Open `bike_selector.py` and edit the `select_bike(...)` call at the bottom:
+## API Endpoints
 
-### Hard Filters (must-meet conditions)
-| Parameter       | Description                        | Example          |
-|-----------------|------------------------------------|------------------|
-| `budget_inr`    | Maximum price in rupees            | `250_000`        |
-| `min_mileage`   | Minimum mileage in kmpl            | `30`             |
-| `preferred_cc`  | Preferred engine CC (0 = any)      | `200` or `0`     |
-| `max_weight_kg` | Maximum curb weight in kg          | `180`            |
-| `top_n`         | Number of bikes to display         | `5`              |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/stats` | Dataset summary and sensitivity counts |
+| GET | `/api/leaderboard` | Model comparison metrics |
+| GET | `/api/bikes` | Filter bikes (`q`, `brand`, `segment`, `sensitivity`, `limit`, `offset`) |
+| POST | `/api/predict` | Predict sensitivity from bike features (JSON body) |
 
-### Priority Weights (1 = normal, 2 = high, 3 = very high)
-| Parameter      | What it boosts                          |
-|----------------|-----------------------------------------|
-| `w_mileage`    | Prefer fuel-efficient bikes             |
-| `w_cost`       | Prefer cheaper bikes                    |
-| `w_cc`         | Prefer higher-engine-capacity bikes     |
-| `w_weight`     | Prefer lightweight bikes                |
-| `w_likeliness` | Prefer overall well-regarded bikes      |
+### Example prediction request
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/predict \
+  -H "Content-Type: application/json" \
+  -d "{\"brand\":\"Honda\",\"segment\":\"mid\",\"speedometer_type\":\"Digital\",\"buyer_behaviour\":\"Might reconsider\",\"cc\":184,\"year\":2020,\"top_speed_kmh\":137,\"mileage_kmpl\":43.8,\"fuel_tank_liters\":10.1,\"factory_price_inr\":100781,\"gst_rate_pct\":28,\"on_road_price_inr\":147604,\"overall_score\":70,\"price_increase_scenario_pct\":9.3}"
+```
+
+Response:
+
+```json
+{
+  "model": "Logistic Regression",
+  "prediction": "Medium",
+  "probabilities": {
+    "High": 0.05,
+    "Low": 0.00,
+    "Medium": 0.81,
+    "Very High": 0.13
+  }
+}
+```
 
 ## How It Works
 
-### 1. Data Filtering
-Removes bikes outside your hard constraints (budget, mileage, CC range, weight).
+### 1. Preprocessing
 
-### 2. TOPSIS Scoring (60% weight)
-*Technique for Order of Preference by Similarity to Ideal Solution* — a classic multi-criteria decision-making algorithm:
-- Normalises all criteria
-- Applies your priority weights
-- Finds the ideal best & worst bike
-- Scores each bike by closeness to ideal
+Raw bike rows are enriched with engineered features: log prices, price per cc, speed per cc, segment flags, GST flag, and speedometer type flag.
 
-### 3. Random Forest ML Scoring (40% weight)
-- Trains a Random Forest on a weighted target score
-- Learns feature importance from your priorities
-- Prints feature importance bar chart
-- Produces an ML-driven ranking
+### 2. Model Training
 
-### 4. KNN — Similar Bikes
-After finding your top pick, K-Nearest Neighbours finds 3 bikes with similar specs as alternatives.
+Features are split into categorical (brand, segment, speedometer type, buyer behaviour) and numerical columns. A `ColumnTransformer` imputes missing values, scales numerics, and one-hot encodes categoricals. Seven classifiers are trained with stratified 5-fold cross-validation.
 
-### 5. Final Score = 60% TOPSIS + 40% ML
+### 3. Target
 
-## 📊 Dataset
-40 real Indian-market bikes across categories: Commuter, Street, Naked, Cruiser, Sport, Adventure, Scrambler.
+The target label is **price sensitivity**, one of:
 
-Fields: `name, brand, cc, mileage_kmpl, price_inr, curb_weight_kg, power_hp, torque_nm, type, abs, fuel_tank_l, likeliness_score`
+- Low
+- Medium
+- High
+- Very High
 
-You can add more bikes by editing `bikes.csv`.
+### 4. Prediction
+
+The highest-accuracy model from the leaderboard is used to classify new bikes via the web form or API.
+
+## Dataset
+
+**File:** `indian_bikes_dataset_1000.csv` (1,000 rows)
+
+**Columns:** `brand`, `model`, `cc`, `segment`, `year`, `speedometer_type`, `top_speed_kmh`, `mileage_kmpl`, `fuel_tank_liters`, `factory_price_inr`, `gst_rate_pct`, `gst_amount_inr`, `ex_showroom_inr`, `on_road_price_inr`, `overall_score`, `price_increase_scenario_pct`, `buyer_behaviour`, `price_sensitivity`
+
+Segments: `budget`, `mid`, `premium`
+
+## Dependencies
+
+- pandas, numpy, scikit-learn — data and ML
+- flask — web app
+- matplotlib, seaborn — optional, for CLI visualizations only
