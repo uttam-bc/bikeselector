@@ -64,10 +64,10 @@ SEG_COLORS = {
 }
 
 SENS_COLORS = {
-    "Low": "#27ae60",
-    "Medium": "#f39c12",
-    "High": "#e67e22",
-    "Very High": "#e74c3c"
+    "Low": "#4A4A4A",
+    "Medium": "#9A8B7A",
+    "High": "#8B6914",
+    "Very High": "#6B2D3C",
 }
 
 SENS_ORDER = [
@@ -881,6 +881,91 @@ def get_form_options(df: pd.DataFrame) -> dict:
         "buyer_behaviours": sorted(df["buyer_behaviour"].unique().tolist()),
         "gst_rates": sorted(df["gst_rate_pct"].unique().tolist()),
     }
+
+
+def select_bikes(
+    df: pd.DataFrame,
+    min_mileage: float,
+    preferred_cc: float,
+    max_price: float,
+    cc_tolerance_pct: float = 25.0,
+    top_n: int = 10,
+) -> pd.DataFrame:
+    """
+    Filter bikes by mileage, price, and CC preference; return top N unique models.
+    One row per brand+model (best matching variant).
+    """
+    filtered = df[
+        (df["mileage_kmpl"] >= min_mileage)
+        & (df["on_road_price_inr"] <= max_price)
+    ].copy()
+
+    if filtered.empty:
+        return filtered
+
+    cc_min = preferred_cc * (1 - cc_tolerance_pct / 100)
+    cc_max = preferred_cc * (1 + cc_tolerance_pct / 100)
+    filtered["cc_diff"] = (filtered["cc"] - preferred_cc).abs()
+    filtered["cc_match"] = filtered["cc"].between(cc_min, cc_max)
+
+    mileage_range = filtered["mileage_kmpl"].max() - filtered["mileage_kmpl"].min()
+    price_range = filtered["on_road_price_inr"].max() - filtered["on_road_price_inr"].min()
+    cc_diff_max = filtered["cc_diff"].max() or 1.0
+
+    norm_mileage = (
+        (filtered["mileage_kmpl"] - filtered["mileage_kmpl"].min()) / mileage_range
+        if mileage_range > 0
+        else 1.0
+    )
+    norm_price = (
+        1 - (filtered["on_road_price_inr"] - filtered["on_road_price_inr"].min()) / price_range
+        if price_range > 0
+        else 1.0
+    )
+    norm_cc = 1 - filtered["cc_diff"] / cc_diff_max
+    norm_score = filtered["overall_score"] / 100.0
+
+    filtered["match_score"] = (
+        0.35 * norm_mileage
+        + 0.30 * norm_price
+        + 0.20 * norm_cc
+        + 0.15 * norm_score
+    )
+    filtered.loc[filtered["cc_match"], "match_score"] += 0.1
+
+    best_idx = filtered.groupby(["brand", "model"])["match_score"].idxmax()
+    results = (
+        filtered.loc[best_idx]
+        .sort_values("match_score", ascending=False)
+        .head(top_n)
+    )
+    return results
+
+
+def select_bikes_to_records(
+    df: pd.DataFrame,
+    min_mileage: float,
+    preferred_cc: float,
+    max_price: float,
+    cc_tolerance_pct: float = 25.0,
+    top_n: int = 10,
+) -> list[dict]:
+    """Return top bike matches as JSON-serializable dicts."""
+    results = select_bikes(
+        df, min_mileage, preferred_cc, max_price, cc_tolerance_pct, top_n
+    )
+    if results.empty:
+        return []
+
+    cols = [
+        "brand", "model", "cc", "year", "segment",
+        "mileage_kmpl", "on_road_price_inr", "overall_score",
+        "top_speed_kmh", "price_sensitivity", "match_score",
+    ]
+    out = results[cols].copy()
+    out["match_score"] = out["match_score"].round(3)
+    out["on_road_price_inr"] = out["on_road_price_inr"].astype(int)
+    return out.to_dict(orient="records")
 
 
 def load_and_train(csv_path: str = "indian_bikes_dataset_1000.csv") -> tuple:

@@ -1,13 +1,14 @@
 # BikeSelect — Indian Bikes Price Sensitivity
 
-A machine learning project that classifies how sensitive Indian motorcycle buyers are to price changes. It trains multiple classifiers on a 1,000-bike dataset and exposes results through a **Flask web app** and a **CLI analysis script**.
+A machine learning project that classifies how sensitive Indian motorcycle buyers are to price changes, plus a **bike finder** that recommends the top 10 models for your budget and specs. It trains multiple classifiers on a 1,000-bike dataset and exposes everything through a **Flask web app** and a **CLI analysis script**.
 
 ## Features
 
+- **Find Bike** — set minimum mileage, preferred CC, and maximum price; get the top 10 matching models ranked by fit
 - **Dashboard** — dataset stats, sensitivity distribution, and model leaderboard
 - **Predict** — enter bike specs and get a price sensitivity label with probability breakdown
 - **Browse Bikes** — search and filter the dataset by brand, segment, and sensitivity
-- **REST API** — JSON endpoints for stats, predictions, bike search, and leaderboard
+- **REST API** — JSON endpoints for stats, bike search, selection, predictions, and leaderboard
 
 ## Project Structure
 
@@ -21,6 +22,7 @@ bikeselect/
 ├── templates/                      # HTML pages
 │   ├── base.html
 │   ├── index.html
+│   ├── select.html
 │   ├── predict.html
 │   └── bikes.html
 └── static/css/style.css
@@ -68,7 +70,42 @@ This loads `indian_bikes_dataset_1000.csv`, prints dataset summary, shows sensit
 | GET | `/api/stats` | Dataset summary and sensitivity counts |
 | GET | `/api/leaderboard` | Model comparison metrics |
 | GET | `/api/bikes` | Filter bikes (`q`, `brand`, `segment`, `sensitivity`, `limit`, `offset`) |
+| POST | `/api/select` | Find top 10 bikes by mileage, CC, and max price (JSON body) |
 | POST | `/api/predict` | Predict sensitivity from bike features (JSON body) |
+
+### Example bike selection request
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/select \
+  -H "Content-Type: application/json" \
+  -d "{\"min_mileage\":35,\"preferred_cc\":200,\"max_price\":200000,\"cc_tolerance_pct\":25}"
+```
+
+Response:
+
+```json
+{
+  "count": 10,
+  "filters": {
+    "min_mileage": 35,
+    "preferred_cc": 200,
+    "max_price": 200000,
+    "cc_tolerance_pct": 25
+  },
+  "bikes": [
+    {
+      "brand": "Bajaj",
+      "model": "CT100",
+      "cc": 102,
+      "mileage_kmpl": 78.1,
+      "on_road_price_inr": 65925,
+      "overall_score": 60,
+      "match_score": 0.802,
+      "price_sensitivity": "Very High"
+    }
+  ]
+}
+```
 
 ### Example prediction request
 
@@ -115,6 +152,12 @@ The target label is **price sensitivity**, one of:
 ### 4. Prediction
 
 The highest-accuracy model from the leaderboard is used to classify new bikes via the web form or API.
+
+### 5. Bike Selection (Find Bike)
+
+Hard filters: mileage ≥ minimum, on-road price ≤ maximum budget.
+
+Each unique **brand + model** is scored on mileage (higher is better), price (lower is better), CC closeness to your preference, and overall score. Models within the CC tolerance band get a bonus. The top 10 models are returned.
 
 ## Dataset
 

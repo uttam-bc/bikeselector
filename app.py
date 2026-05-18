@@ -9,6 +9,7 @@ from bike_selector import (
     get_dataset_stats,
     get_form_options,
     load_and_train,
+    select_bikes_to_records,
 )
 
 app = Flask(__name__)
@@ -59,6 +60,57 @@ def predict_page():
         options=form_options,
         sens_colors=SENS_COLORS,
     )
+
+
+@app.route("/select")
+def select_page():
+    return render_template(
+        "select.html",
+        defaults={
+            "min_mileage": 35,
+            "preferred_cc": 200,
+            "max_price": 200000,
+            "cc_tolerance_pct": 25,
+        },
+        sens_colors=SENS_COLORS,
+        price_max=int(df["on_road_price_inr"].max()),
+        mileage_max=float(df["mileage_kmpl"].max()),
+    )
+
+
+@app.route("/api/select", methods=["POST"])
+def api_select():
+    data = request.get_json(silent=True) or request.form
+    try:
+        min_mileage = float(data["min_mileage"])
+        preferred_cc = float(data["preferred_cc"])
+        max_price = float(data["max_price"])
+        cc_tolerance_pct = float(data.get("cc_tolerance_pct", 25))
+        top_n = min(int(data.get("top_n", 10)), 10)
+    except (KeyError, TypeError, ValueError) as exc:
+        return jsonify({"error": f"Invalid input: {exc}"}), 400
+
+    if min_mileage < 0 or preferred_cc <= 0 or max_price <= 0:
+        return jsonify({"error": "Values must be positive"}), 400
+
+    results = select_bikes_to_records(
+        df,
+        min_mileage=min_mileage,
+        preferred_cc=preferred_cc,
+        max_price=max_price,
+        cc_tolerance_pct=cc_tolerance_pct,
+        top_n=top_n,
+    )
+    return jsonify({
+        "count": len(results),
+        "filters": {
+            "min_mileage": min_mileage,
+            "preferred_cc": preferred_cc,
+            "max_price": max_price,
+            "cc_tolerance_pct": cc_tolerance_pct,
+        },
+        "bikes": results,
+    })
 
 
 @app.route("/bikes")
